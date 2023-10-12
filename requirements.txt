@@ -1,0 +1,8 @@
+
+streamlit
+numpy
+pandas
+scikit-learn
+sqlalchemy
+pydeck
+folium
