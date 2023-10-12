@@ -1,3 +1,4 @@
+import os
 import logging
 import logging.handlers
 
@@ -29,15 +30,21 @@ def get_logger(
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
             )
 
-        # Create file handler for logging
-        file_handler = logging.handlers.RotatingFileHandler(
-            log_file, maxBytes=10 * 1024 * 1024, backupCount=5
-        )  # 10MB file size, keep last 5 log files
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
+        # If in testing environment, don't write to file
+        if os.environ.get("TESTING"):
+            # Clear existing handlers
+            logger.handlers = []
+            handler = logging.NullHandler()  # Use a handler that does nothing
+        else:
+            # Create file handler for logging
+            handler = logging.handlers.RotatingFileHandler(
+                log_file, maxBytes=10 * 1024 * 1024, backupCount=5
+            )  # 10MB file size, keep last 5 log files
+            handler.setLevel(level)
+            handler.setFormatter(formatter)
 
         # Add the handlers to the logger
-        logger.addHandler(file_handler)
+        logger.addHandler(handler)
 
         # Set level for the logger instance
         logger.setLevel(level)
