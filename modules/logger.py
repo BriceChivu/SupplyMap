@@ -31,7 +31,7 @@ def get_logger(
             )
 
         # If in testing environment, don't write to file
-        if os.environ.get("TESTING"):
+        if os.environ.get("LOG") == "false":
             # Clear existing handlers
             logger.handlers = []
             handler = logging.NullHandler()  # Use a handler that does nothing

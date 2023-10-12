@@ -1,7 +1,7 @@
 import os
 
 # needs to be before the process_data import otherwise it will create a log file
-os.environ["TESTING"] = "true"
+os.environ["LOG"] = "false"
 
 import pandas as pd
 from modules.data_processing import process_data
@@ -108,7 +108,9 @@ def test_missing_values_dataset():
     # Check if processed_df is not None before proceeding with other assertions
     assert processed_df is not None, "Failed to process dataset with missing values."
 
-    assert not processed_df.empty, "Dataset with missing values processing resulted in an empty dataframe."
+    assert (
+        not processed_df.empty
+    ), "Dataset with missing values processing resulted in an empty dataframe."
     assert (
         len(processed_df) == len(df) - 1
     ), "Records with missing values not handled correctly."
