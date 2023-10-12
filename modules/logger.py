@@ -3,7 +3,7 @@ import logging.handlers
 
 
 def get_logger(
-    name=__name__, log_file="supply_chain_app.log", level=logging.INFO, formatter=None
+    name=__name__, log_file="supplymap.log", level=logging.INFO, formatter=None
 ):
     """
     Get a logger instance.

@@ -4,7 +4,7 @@ from modules.logger import get_logger
 
 def test_get_logger():
     # Define log file path
-    log_file = "test_supply_chain_app.log"
+    log_file = "test_supplymap.log"
 
     # Get a logger instance
     logger = get_logger(log_file=log_file)
@@ -33,7 +33,7 @@ def test_get_logger():
 
 def test_rotating_file_handler():
     # Define log file path
-    log_file = "test_supply_chain_app.log"
+    log_file = "test_supplymap.log"
 
     # Get a logger instance
     logger = get_logger(log_file=log_file)
