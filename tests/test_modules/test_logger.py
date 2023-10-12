@@ -1,6 +1,8 @@
 import os
 from modules.logger import get_logger
 
+# To see the print statements, run pytest -s tests/test_modules/test_logger.py
+
 
 def test_get_logger():
     # Define log file path
@@ -10,7 +12,7 @@ def test_get_logger():
     logger = get_logger(log_file=log_file)
 
     # Log a test message
-    test_msg = "This is a test log message."
+    test_msg = "This is a test log message. "
     logger.info(test_msg)
     print(f"Logged message: {test_msg}")
 
