@@ -1,27 +1,44 @@
 from modules.logger import get_logger
 
 logger = get_logger()
+# Define permissible missing values
+permissible_missing = {None, "", "na", "nan"}
+
+
+def is_permissible_missing(value):
+    """Check if a value is one of the permissible missing values."""
+    return str(value).strip().lower() in permissible_missing
 
 
 def validate_latitude_column(series):
-    """Check if a series contains valid latitude values."""
-    return series.between(-90, 90).all()
+    """Check if a series contains valid latitude values (-90 to 90) or permissible missing values."""
+    return series.apply(
+        lambda x: (isinstance(x, (int, float)) and -90 <= x <= 90)
+        or is_permissible_missing(x)
+    ).all()
 
 
 def validate_longitude_column(series):
-    """Check if a series contains valid longitude values."""
-    return series.between(-180, 180).all()
+    """Check if a series contains valid longitude values (-180 to 180) or permissible missing values."""
+    return series.apply(
+        lambda x: (isinstance(x, (int, float)) and -180 <= x <= 180)
+        or is_permissible_missing(x)
+    ).all()
 
 
 def validate_volume_column(series):
-    """Check if a series contains valid volume values."""
-    return series.dtype in ["float64", "int64"] and (series >= 0).all()
+    """Check if a series contains valid volume values or permissible missing values."""
+    return series.apply(
+        lambda x: isinstance(x, (int, float)) or is_permissible_missing(x)
+    ).all()
 
 
 def validate_type_column(series):
-    """Check if a series contains only 'supply' or 'demand' values, regardless of case."""
+    """Check if a series contains only 'supply' or 'demand' values, regardless of case, or permissible missing values."""
     valid_values = {"supply", "demand"}
-    return series.str.lower().isin(valid_values).all()
+    return series.apply(
+        lambda x: str(x).strip().lower() in valid_values or is_permissible_missing(x)
+    ).all()
 
 
 def detect_and_validate_columns(df):
@@ -53,15 +70,14 @@ def detect_and_validate_columns(df):
         logger.error(f"Detected volume column '{volume_col}' has invalid data.")
         volume_col = None
 
-    if type_col and not validate_type_column(df[type_col]):
-        logger.error(
-            f"Detected type column '{type_col}' has invalid entries. "
-            "Only 'supply' and 'demand' are valid."
-        )
-        type_col = None
-
-    # If no type column is detected, assign 'demand' to all records
-    if not type_col:
+    if type_col:
+        if not validate_type_column(df[type_col]):
+            logger.error(
+                f"Detected type column '{type_col}' has invalid entries. "
+                "Only 'supply' and 'demand' are valid."
+            )
+            type_col = None
+    else:
         df["type"] = "demand"
         type_col = "type"
 
@@ -94,6 +110,8 @@ def process_data(df):
     """
     Process the uploaded data.
     """
+    # Create a deep copy of the DataFrame to avoid modifying the original
+    df = df.copy(deep=True)
 
     # Detect and validate columns
     lat_col, long_col, volume_col, type_col = detect_and_validate_columns(df)
