@@ -1,3 +1,5 @@
+# This is the data_processing.py file.
+
 from modules.logger import get_logger
 
 logger = get_logger()
@@ -10,35 +12,69 @@ def is_permissible_missing(value):
     return str(value).strip().lower() in permissible_missing
 
 
+def is_valid_latitude(value):
+    """Check if a value is a valid latitude (-90 to 90)."""
+    try:
+        value = float(str(value).strip())
+        return -90 <= value <= 90
+    except ValueError:
+        return False
+
+
+def is_valid_longitude(value):
+    """Check if a value is a valid longitude (-180 to 180)."""
+    try:
+        value = float(str(value).strip())
+        return -180 <= value <= 180
+    except ValueError:
+        return False
+
+
+def is_valid_type(value):
+    """Check if a value is a valid type ('supply' or 'demand')."""
+    value = str(value).strip().lower()
+    return value in ["supply", "demand"]
+
+
+def is_valid_volume(value):
+    """Check if a value is a valid volume (numeric and non-negative)."""
+    try:
+        volume = float(str(value).strip())
+        return volume >= 0
+    except ValueError:
+        return False
+
+
 def validate_latitude_column(series):
     """Check if a series contains valid latitude values (-90 to 90) or permissible missing values."""
-    return series.apply(
-        lambda x: (isinstance(x, (int, float)) and -90 <= x <= 90)
-        or is_permissible_missing(x)
-    ).all()
+    invalid_entries = series[
+        ~series.apply(lambda x: is_valid_latitude(x) or is_permissible_missing(x))
+    ]
+    return invalid_entries.empty, invalid_entries
 
 
 def validate_longitude_column(series):
     """Check if a series contains valid longitude values (-180 to 180) or permissible missing values."""
-    return series.apply(
-        lambda x: (isinstance(x, (int, float)) and -180 <= x <= 180)
-        or is_permissible_missing(x)
-    ).all()
-
-
-def validate_volume_column(series):
-    """Check if a series contains valid volume values or permissible missing values."""
-    return series.apply(
-        lambda x: isinstance(x, (int, float)) or is_permissible_missing(x)
-    ).all()
+    invalid_entries = series[
+        ~series.apply(lambda x: is_valid_longitude(x) or is_permissible_missing(x))
+    ]
+    return invalid_entries.empty, invalid_entries
 
 
 def validate_type_column(series):
-    """Check if a series contains only 'supply' or 'demand' values, regardless of case, or permissible missing values."""
-    valid_values = {"supply", "demand"}
-    return series.apply(
-        lambda x: str(x).strip().lower() in valid_values or is_permissible_missing(x)
-    ).all()
+    """Check if a series contains valid type values ('supply' or 'demand') or permissible missing values."""
+    invalid_entries = series[
+        ~series.apply(lambda x: is_valid_type(x) or is_permissible_missing(x))
+    ]
+    return invalid_entries.empty, invalid_entries
+
+
+def validate_volume_column(series):
+    """Check if a series contains valid volume values (numeric) or permissible missing values."""
+    invalid_entries = series[
+        ~series.apply(lambda x: is_valid_volume(x) or is_permissible_missing(x))
+    ]
+    return invalid_entries.empty, invalid_entries
 
 
 def detect_and_validate_columns(df):
@@ -58,25 +94,30 @@ def detect_and_validate_columns(df):
     type_col = next((col for col in df.columns if col in valid_type_names), None)
 
     # Validate detected columns
-    if lat_col and not validate_latitude_column(df[lat_col]):
-        logger.error(f"Detected latitude column '{lat_col}' has invalid data.")
-        lat_col = None
+    valid_lat, invalid_lat_entries = validate_latitude_column(df[lat_col])
+    if lat_col and not valid_lat:
+        logger.error(
+            f"Invalid data found in the latitude column '{lat_col}': {invalid_lat_entries.to_dict()}. Valid entries are between -90 and 90."
+        )
 
-    if long_col and not validate_longitude_column(df[long_col]):
-        logger.error(f"Detected longitude column '{long_col}' has invalid data.")
-        long_col = None
+    valid_lon, invalid_lon_entries = validate_longitude_column(df[long_col])
+    if long_col and not valid_lon:
+        logger.error(
+            f"Invalid data found in the longitude column '{long_col}': {invalid_lon_entries.to_dict()}. Valid entries are between -180 and 180."
+        )
 
-    if volume_col and not validate_volume_column(df[volume_col]):
-        logger.error(f"Detected volume column '{volume_col}' has invalid data.")
-        volume_col = None
+    valid_vol, invalid_vol_entries = validate_volume_column(df[volume_col])
+    if volume_col and not valid_vol:
+        logger.error(
+            f"Invalid data found in the volume column '{volume_col}': {invalid_vol_entries.to_dict()}. Valid entries are non-negative numbers."
+        )
 
-    if type_col:
-        if not validate_type_column(df[type_col]):
-            logger.error(
-                f"Detected type column '{type_col}' has invalid entries. "
-                "Only 'supply' and 'demand' are valid."
-            )
-            type_col = None
+    valid_type, invalid_type_entries = validate_type_column(df[type_col])
+    if type_col and not valid_type:
+        logger.error(
+            f"Invalid entries detected in the type column '{type_col}': {invalid_type_entries.to_dict()}. Valid entries are 'supply' and 'demand'."
+        )
+
     else:
         df["type"] = "demand"
         type_col = "type"
@@ -99,7 +140,9 @@ def handle_missing_values(df):
     if not missing_data_records.empty:
         logger.warning("Records with missing values detected:")
         for _, row in missing_data_records.iterrows():
-            logger.warning(f"Index {row.name}: {row.to_dict()}")
+            # Adjust the index for better reference to the displayed DataFrame
+            adjusted_index = row.name + 2
+            logger.warning(f"Row {adjusted_index}: {row.to_dict()}")
 
     df.dropna(inplace=True)
 
@@ -110,6 +153,10 @@ def process_data(df):
     """
     Process the uploaded data.
     """
+    # Log the dataset being processed
+    logger.info("===========================================")
+    logger.info("Processing a new dataset...")
+
     # Create a deep copy of the DataFrame to avoid modifying the original
     df = df.copy(deep=True)
 
