@@ -56,3 +56,32 @@ docker-compose.override.yml
 Thumbs.db  # Windows
 Desktop.ini # Windows
 *.swp      # Linux (Vim swap files)
+
+# Data files
+*.csv
+*.xls
+*.xlsx
+*.db
+*.sql
+*.sqlite
+*.sqlite3
+*.json
+*.xml
+*.hdf5
+*.h5
+*.mat
+*.sav
+*.rdata
+*.rds
+*.pkl
+*.parquet
+*.feather
+*.arrow
+*.tsv
+*.dat
+*.tar.gz
+*.zip
+*.gz
+*.bz2
+*.rar
+*.7z
