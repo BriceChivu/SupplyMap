@@ -1,10 +1,9 @@
-# This is the data_processing.py file.
-
 from modules.logger import get_logger
 
 logger = get_logger()
+
 # Define permissible missing values
-permissible_missing = {None, "", "na", "nan"}
+permissible_missing = {None, "", "na", "nan", "n/a"}
 
 
 def is_permissible_missing(value):
@@ -45,42 +44,39 @@ def is_valid_volume(value):
         return False
 
 
-def validate_latitude_column(series):
-    """Check if a series contains valid latitude values (-90 to 90) or permissible missing values."""
-    invalid_entries = series[
-        ~series.apply(lambda x: is_valid_latitude(x) or is_permissible_missing(x))
+def log_invalid_entries(df, validation_function, column_name, valid_description):
+    """Log invalid entries for a given column."""
+    invalid_entries = df[
+        ~df[column_name].apply(
+            lambda x: validation_function(x) or is_permissible_missing(x)
+        )
     ]
-    return invalid_entries.empty, invalid_entries
+
+    if not invalid_entries.empty:
+        logger.error(
+            f"Invalid data found in the column '{column_name}': {invalid_entries.to_dict()}. {valid_description}"
+        )
+
+    return (
+        invalid_entries.index
+    )  # Return indices of invalid entries for further processing
 
 
-def validate_longitude_column(series):
-    """Check if a series contains valid longitude values (-180 to 180) or permissible missing values."""
-    invalid_entries = series[
-        ~series.apply(lambda x: is_valid_longitude(x) or is_permissible_missing(x))
-    ]
-    return invalid_entries.empty, invalid_entries
+def clean_dataframe(df, invalid_indices):
+    """Drop rows with invalid entries based on provided indices and rows with permissible missing values."""
 
+    # Drop rows with invalid indices
+    df.drop(invalid_indices, inplace=True, errors="ignore")
 
-def validate_type_column(series):
-    """Check if a series contains valid type values ('supply' or 'demand') or permissible missing values."""
-    invalid_entries = series[
-        ~series.apply(lambda x: is_valid_type(x) or is_permissible_missing(x))
-    ]
-    return invalid_entries.empty, invalid_entries
+    # Drop rows with permissible missing values
+    for column in df.columns:
+        permissible_missing_indices = df[df[column].apply(is_permissible_missing)].index
+        df.drop(permissible_missing_indices, inplace=True, errors="ignore")
 
-
-def validate_volume_column(series):
-    """Check if a series contains valid volume values (numeric) or permissible missing values."""
-    invalid_entries = series[
-        ~series.apply(lambda x: is_valid_volume(x) or is_permissible_missing(x))
-    ]
-    return invalid_entries.empty, invalid_entries
+    return df
 
 
 def detect_and_validate_columns(df):
-    """
-    Detect and validate necessary columns.
-    """
     # Define valid column names
     valid_lat_names = ["lat", "Lat", "Latitude", "latitude"]
     valid_lon_names = ["lon", "Lon", "long", "Long", "Longitude", "longitude"]
@@ -93,34 +89,30 @@ def detect_and_validate_columns(df):
     volume_col = next((col for col in df.columns if col in valid_vol_names), None)
     type_col = next((col for col in df.columns if col in valid_type_names), None)
 
-    # Validate detected columns
-    valid_lat, invalid_lat_entries = validate_latitude_column(df[lat_col])
-    if lat_col and not valid_lat:
-        logger.error(
-            f"Invalid data found in the latitude column '{lat_col}': {invalid_lat_entries.to_dict()}. Valid entries are between -90 and 90."
-        )
+    # Log invalid entries for detected columns
+    invalid_lat_indices = log_invalid_entries(
+        df, is_valid_latitude, lat_col, "Valid entries are between -90 and 90."
+    )
+    invalid_long_indices = log_invalid_entries(
+        df, is_valid_longitude, long_col, "Valid entries are between -180 and 180."
+    )
+    invalid_vol_indices = log_invalid_entries(
+        df, is_valid_volume, volume_col, "Valid entries are non-negative numbers."
+    )
+    invalid_type_indices = log_invalid_entries(
+        df, is_valid_type, type_col, "Valid entries are 'supply' and 'demand'."
+    )
 
-    valid_lon, invalid_lon_entries = validate_longitude_column(df[long_col])
-    if long_col and not valid_lon:
-        logger.error(
-            f"Invalid data found in the longitude column '{long_col}': {invalid_lon_entries.to_dict()}. Valid entries are between -180 and 180."
-        )
+    # Aggregate all invalid indices
+    all_invalid_indices = (
+        set(invalid_lat_indices)
+        | set(invalid_long_indices)
+        | set(invalid_vol_indices)
+        | set(invalid_type_indices)
+    )
 
-    valid_vol, invalid_vol_entries = validate_volume_column(df[volume_col])
-    if volume_col and not valid_vol:
-        logger.error(
-            f"Invalid data found in the volume column '{volume_col}': {invalid_vol_entries.to_dict()}. Valid entries are non-negative numbers."
-        )
-
-    valid_type, invalid_type_entries = validate_type_column(df[type_col])
-    if type_col and not valid_type:
-        logger.error(
-            f"Invalid entries detected in the type column '{type_col}': {invalid_type_entries.to_dict()}. Valid entries are 'supply' and 'demand'."
-        )
-
-    else:
-        df["type"] = "demand"
-        type_col = "type"
+    # Clean the dataframe
+    df = clean_dataframe(df, all_invalid_indices)
 
     # Log detected and validated columns
     logger.info(f"Using '{lat_col}' as latitude column.")
@@ -131,31 +123,10 @@ def detect_and_validate_columns(df):
     return lat_col, long_col, volume_col, type_col
 
 
-def handle_missing_values(df):
-    """
-    Drop records with missing values and log the details of the dropped records.
-    """
-    missing_data_records = df[df.isnull().any(axis=1)]
-
-    if not missing_data_records.empty:
-        logger.warning("Records with missing values detected:")
-        for _, row in missing_data_records.iterrows():
-            # Adjust the index for better reference to the displayed DataFrame
-            adjusted_index = row.name + 2
-            logger.warning(f"Row {adjusted_index}: {row.to_dict()}")
-
-    df.dropna(inplace=True)
-
-    return df
-
-
-def process_data(df):
-    """
-    Process the uploaded data.
-    """
+def process_data(df, filename):
     # Log the dataset being processed
     logger.info("===========================================")
-    logger.info("Processing a new dataset...")
+    logger.info(f"Processing {filename}...")
 
     # Create a deep copy of the DataFrame to avoid modifying the original
     df = df.copy(deep=True)
@@ -169,9 +140,6 @@ def process_data(df):
             "Failed to detect or validate all necessary columns. Processing halted."
         )
         return None
-
-    # Handle missing values
-    df = handle_missing_values(df)
 
     # Return the processed dataframe
     return df[[lat_col, long_col, volume_col, type_col]]
