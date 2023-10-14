@@ -54,12 +54,21 @@ def log_invalid_entries(df, validation_function, column_name, valid_description)
 
     if not invalid_entries.empty:
         logger.error(
-            f"Invalid data found in the column '{column_name}': {invalid_entries.to_dict()}. {valid_description}"
+            f"Invalid data found in the column '{column_name}': {invalid_entries[column_name].to_dict()}. {valid_description}"
         )
 
-    return (
-        invalid_entries.index
-    )  # Return indices of invalid entries for further processing
+    return invalid_entries.index
+
+
+def log_missing_values(df):
+    """Log rows with missing values."""
+    missing_rows = df[df.applymap(is_permissible_missing).any(axis=1)]
+    if not missing_rows.empty:
+        missing_indices = missing_rows.index.tolist()
+        logger.warning(
+            f"Rows with missing values detected at indices: {missing_indices}"
+        )
+    return missing_rows.index
 
 
 def clean_dataframe(df, invalid_indices):
@@ -103,13 +112,20 @@ def detect_and_validate_columns(df):
         df, is_valid_type, type_col, "Valid entries are 'supply' and 'demand'."
     )
 
-    # Aggregate all invalid indices
+    # Log missing values and aggregate their indices
+    missing_indices = log_missing_values(df)
+
+    # Aggregate all invalid and missing indices
     all_invalid_indices = (
         set(invalid_lat_indices)
         | set(invalid_long_indices)
         | set(invalid_vol_indices)
         | set(invalid_type_indices)
+        | set(missing_indices)
     )
+
+    # Log message about dropping rows
+    logger.info("Rows with missing or invalid entries mentioned above will be dropped.")
 
     # Clean the dataframe
     df = clean_dataframe(df, all_invalid_indices)
