@@ -72,6 +72,8 @@ def main():
                 logger.error(f"Failed to process the uploaded file: {e}")
         elif st.session_state.processed_df is not None:
             st.write(st.session_state.processed_df.head())
+            with open('st.session_state.processed_df.csv') as f:
+                st.download_button('Download CSV', f)
 
     elif tab == "View Logs":
         # Display Logs
@@ -98,8 +100,6 @@ def main():
         if st.session_state.processed_df is not None:
             # Sidebar settings
             st.sidebar.header("Map Settings")
-
-            
 
             supply_color = hex_to_rgba(
                 st.sidebar.color_picker("Choose Supply Color", "#FF0000")
