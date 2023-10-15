@@ -124,8 +124,11 @@ def detect_and_validate_columns(df):
         | set(missing_indices)
     )
 
-    # Log message about dropping rows
-    logger.info("Rows with missing or invalid entries mentioned above will be dropped.")
+    if missing_indices.any():
+        # Log message about dropping rows
+        logger.info(
+            "Rows with missing or invalid entries mentioned above will be dropped."
+        )
 
     # Clean the dataframe
     df = clean_dataframe(df, all_invalid_indices)
@@ -157,5 +160,9 @@ def process_data(df, filename):
         )
         return None
 
-    # Return the processed dataframe
-    return df[[lat_col, long_col, volume_col, type_col]]
+    return df[[lat_col, long_col, volume_col, type_col]], (
+        lat_col,
+        long_col,
+        volume_col,
+        type_col,
+    )
