@@ -30,6 +30,15 @@ def hex_to_rgba(hex_color):
     return [int(hex_color[i : i + 2], 16) for i in (1, 3, 5)] + [150]
 
 
+import streamlit as st
+
+
+@st.cache_data
+def convert_df_to_csv(df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.to_csv().encode("utf-8")
+
+
 # Main App
 def main():
     st.title("Supply Chain Optimization App")
@@ -43,6 +52,9 @@ def main():
     # Initialize 'column_names' in session state if not already present
     if "column_names" not in st.session_state:
         st.session_state.column_names = None
+    # Initialize 'uploaded_file_name' in session state if not already present
+    if "uploaded_file_name" not in st.session_state:
+        st.session_state.uploaded_file_name = None
 
     # Tab-like sections using st.radio
     tab = st.radio("Go to", ["Upload Dataset", "View Logs", "Visualize Data"])
@@ -61,8 +73,18 @@ def main():
                     st.session_state.processed_df,
                     st.session_state.column_names,
                 ) = process_data(df, uploaded_file.name)
+                # Store the uploaded file's name in the session state
+                st.session_state.uploaded_file_name = uploaded_file.name
+
                 if st.session_state.processed_df is not None:
-                    st.write(st.session_state.processed_df.head())
+                    st.write(st.session_state.processed_df.head(50))
+                    # Download Button
+                    st.download_button(
+                        label="Download data as CSV",
+                        data=convert_df_to_csv(st.session_state.processed_df),
+                        file_name=f"{st.session_state.uploaded_file_name}_cleaned.csv",
+                        mime="text/csv",
+                    )
                 else:
                     st.error(
                         "The uploaded dataset couldn't be processed correctly. Please check the logs for more details."
@@ -71,9 +93,14 @@ def main():
                 st.error(f"An error occurred: {e}")
                 logger.error(f"Failed to process the uploaded file: {e}")
         elif st.session_state.processed_df is not None:
-            st.write(st.session_state.processed_df.head())
-            with open('st.session_state.processed_df.csv') as f:
-                st.download_button('Download CSV', f)
+            st.write(st.session_state.processed_df.head(50))
+            # Download Button for the case when the file isn't uploaded but there's a processed dataframe in session state
+            st.download_button(
+                label="Download cleaned data as CSV",
+                data=convert_df_to_csv(st.session_state.processed_df),
+                file_name=f"{st.session_state.uploaded_file_name}_cleaned.csv",
+                mime="text/csv",
+            )
 
     elif tab == "View Logs":
         # Display Logs
