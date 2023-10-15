@@ -27,7 +27,10 @@ else:
 def main():
     st.title("Supply Chain Optimization App")
 
-    # Store uploaded and processed dataset in session state
+    # Initialize 'logs' in session state if not already present
+    if 'logs' not in st.session_state:
+        st.session_state.logs = []
+    # Initialize 'processed_df' in session state if not already present
     if "processed_df" not in st.session_state:
         st.session_state.processed_df = None
 

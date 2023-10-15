@@ -62,7 +62,7 @@ def log_invalid_entries(df, validation_function, column_name, valid_description)
 
 def log_missing_values(df):
     """Log rows with missing values."""
-    missing_rows = df[df.applymap(is_permissible_missing).any(axis=1)]
+    missing_rows = df[df.map(is_permissible_missing).any(axis=1)]
     if not missing_rows.empty:
         missing_indices = missing_rows.index.tolist()
         logger.warning(
